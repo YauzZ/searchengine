@@ -21,3 +21,15 @@ class crawler:
 
 	def separatewords(self,text):
 		return None
+
+	def isindexed(self,url):
+		return False
+
+	def addlinkref(self,urlFrom,urlTo,linkText):
+		pass
+
+	def crawl(self,pages,depth=2):
+		pass
+
+	def createindextables(self):
+		pass
