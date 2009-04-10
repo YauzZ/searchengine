@@ -164,9 +164,10 @@ class searcher:
 	def getscoredlist(self,rows,wordids):
 		totalscores=dict([(row[0],0) for row in rows])
 
-		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
-				 (1.0,self.locationscore(rows)),	#文档位置
-				 (1.0,self.distancescore(rows))]	#单词距离
+		weights=[#(1.0,self.frequencyscore(rows)),	#单词频度
+				 #(1.0,self.locationscore(rows)),	#文档位置
+				 #(1.0,self.distancescore(rows)),	#单词距离
+				 (1.0,self.inboundlinkscore(rows))]	#外部回指链接简单计数
 
 		for (weight,scores) in weights:
 			for url in totalscores:
@@ -221,3 +222,10 @@ class searcher:
 			if dist<mindistance[row[0]]:
 				mindistance[row[0]]=dist
 		return self.normalizescores(mindistance,smallIsBetter=1)
+
+	def inboundlinkscore(self,rows):
+		uniqueurls=set([row[0] for row in rows])
+		inboundcount=dict([(u,self.con.execute( \
+						'select count(*) from link where toid=%d' %u).fetchone()[0]) \
+						for u in uniqueurls])
+		return self.normalizescores(inboundcount)
