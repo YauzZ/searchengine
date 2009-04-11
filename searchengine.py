@@ -79,6 +79,18 @@ class crawler:
 		return False
 
 	def addlinkref(self,urlFrom,urlTo,linkText):
+		fromid=self.getentryid('urllist','url',urlFrom)
+		toid=self.getentryid('urllist','url',urlTo)
+		
+		cur=self.con.execute(
+				"select rowid from link where fromid='%s' and toid='%s'" % (fromid,toid))
+		res=cur.fetchone()
+		if res==None:
+			cur=self.con.execute(          
+				"insert into link (fromid,toid) values ('%s','%s')" %(fromid,toid))
+			return cur.lastrowid           
+		else:
+		    return res[0]
 		pass
 
 	def crawl(self,pages,depth=2):
@@ -164,9 +176,9 @@ class searcher:
 	def getscoredlist(self,rows,wordids):
 		totalscores=dict([(row[0],0) for row in rows])
 
-		weights=[#(1.0,self.frequencyscore(rows)),	#单词频度
-				 #(1.0,self.locationscore(rows)),	#文档位置
-				 #(1.0,self.distancescore(rows)),	#单词距离
+		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
+				 (1.0,self.locationscore(rows)),	#文档位置
+				 (1.0,self.distancescore(rows)),	#单词距离
 				 (1.0,self.inboundlinkscore(rows))]	#外部回指链接简单计数
 
 		for (weight,scores) in weights:
