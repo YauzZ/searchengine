@@ -30,8 +30,6 @@ class crawler:
 			return res[0]
 	
 	def addtoindex(self,url,soup):
-		if self.isindexed(url):
-			return True
 		print 'Indexing %s' % url 
 
 		text=self.gettextonly(soup)
@@ -74,8 +72,6 @@ class crawler:
 			if v!=None:
 				print "indexed :",url
 				return True
-				
-				
 		return False
 
 	def addlinkref(self,urlFrom,urlTo,linkText):
@@ -107,7 +103,11 @@ class crawler:
 					print "Could not open %s" % page
 					continue
 				soup=BeautifulSoup(c.read())
-				self.addtoindex(page,soup)
+			
+				if self.isindexed(page):
+					continue
+				else:
+					self.addtoindex(page,soup)
 
 				links=soup('a')
 				for link in links:
