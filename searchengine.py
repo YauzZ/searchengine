@@ -88,11 +88,15 @@ class crawler:
 		if res==None:
 			cur=self.con.execute(          
 				"insert into link (fromid,toid) values ('%s','%s')" %(fromid,toid))
-			return cur.lastrowid           
+			linkid=cur.lastrowid           
 		else:
-		    return res[0]
-		pass
+		    linkid=res[0]
 
+		words=self.separatewords(linkText)
+		for word in words:
+			wordid=self.getentryid('wordlist','word',word)
+			cur=self.con.execute("insert into linkwords (wordid,linkid) values ('%s','%s')" %(linkid,wordid))
+		
 	def crawl(self,pages,depth=2):
 		for i in range(depth):
 			newpages=set()
