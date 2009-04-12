@@ -104,10 +104,10 @@ class crawler:
 					continue
 				soup=BeautifulSoup(c.read())
 			
-				if self.isindexed(page):
-					continue
-				else:
+				if not self.isindexed(page):
 					self.addtoindex(page,soup)
+				else: 
+					continue
 
 				links=soup('a')
 				for link in links:
@@ -135,7 +135,22 @@ class crawler:
 		self.con.execute('create index IF NOT EXISTS urltoidx on link(toid)')
 		self.con.execute('create index IF NOT EXISTS urlfrom on link(fromid)')
 		self.dbcommit()
-		pass
+
+	def calculatepagerank(self,iterations=20):
+		self.con.execute('drop table if exists pagerank')
+		self.con.execute('create table pagerank(urlid primary key,score)')
+		self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
+		self.dbcommit()
+		for i in range(iterations):
+			print "Iteration %d" % (i) 
+			for (urlid,) in self.con.execute('select rowid from urllist'):
+				pr=0.15
+				for (linker,) in self.con.execute('select distinct fromid from link where toid=%d' % urlid):
+					linkingpr=self.con.execute('select score from pagerank where urlid=%d' % linker).fetchone()[0]
+					linkingcount=self.con.execute('select count(*) from link where fromid=%d' % linker).fetchone()[0]
+					pr+=0.85*(linkingpr/linkingcount)
+					self.con.execute('update pagerank set score=%f where urlid=%d' % (pr,urlid))
+		self.dbcommit()
 
 if __name__ == "__main__":
 	print "searchengine ok"
@@ -183,7 +198,9 @@ class searcher:
 		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
 				 (1.0,self.locationscore(rows)),	#文档位置
 				 (1.0,self.distancescore(rows)),	#单词距离
-				 (1.0,self.inboundlinkscore(rows))]	#外部回指链接简单计数
+				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
+				 (1.0,self.pagerankscore(rows))	#PageRank算法
+				]
 
 		for (weight,scores) in weights:
 			for url in totalscores:
@@ -245,3 +262,11 @@ class searcher:
 						'select count(*) from link where toid=%d' %u).fetchone()[0]) \
 						for u in uniqueurls])
 		return self.normalizescores(inboundcount)
+	
+	def pagerankscore(self,rows):
+		pageranks=dict([(row[0],self.con.execute('select score from pagerank where \
+					urlid=%d' % row[0]).fetchone()[0]) for row in rows])
+		#maxrank=max(pageranks.values())
+		#normalizedscores=dict([(u,float(1)/maxrank) for (u,l) in pageranks.items()])
+		#return normalizedscores
+		return self.normalizescores(pageranks)
