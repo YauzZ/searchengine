@@ -126,9 +126,9 @@ class crawler:
 	def createindextables(self):
 		self.con.execute('create table IF NOT EXISTS urllist(url)')
 		self.con.execute('create table IF NOT EXISTS wordlist(word)')
-		self.con.execute('create table IF NOT EXISTS wordlocation(urlid,wordid,location)')
+		self.con.execute('create table IF NOT EXISTS wordlocation(urlid interger,wordid interger,location)')
 		self.con.execute('create table IF NOT EXISTS link(fromid integer,toid integer)')
-		self.con.execute('create table IF NOT EXISTS linkwords(wordid,linkid)')
+		self.con.execute('create table IF NOT EXISTS linkwords(wordid interger,linkid interger)')
 		self.con.execute('create index IF NOT EXISTS wordidx on wordlist(word)')
 		self.con.execute('create index IF NOT EXISTS urlidx on urllist(url)')
 		self.con.execute('create index IF NOT EXISTS wordurlidx on wordlocation(wordid)')
@@ -199,7 +199,8 @@ class searcher:
 				 (1.0,self.locationscore(rows)),	#文档位置
 				 (1.0,self.distancescore(rows)),	#单词距离
 				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
-				 (1.0,self.pagerankscore(rows))	#PageRank算法
+				 (1.0,self.pagerankscore(rows)),	#PageRank算法
+				 (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
 				]
 
 		for (weight,scores) in weights:
@@ -270,3 +271,18 @@ class searcher:
 		#normalizedscores=dict([(u,float(1)/maxrank) for (u,l) in pageranks.items()])
 		#return normalizedscores
 		return self.normalizescores(pageranks)
+
+	def linktextscore(self,rows,wordids):
+		linkscores=dict([(row[0],0) for row in rows])
+		for wordid in wordids:
+			cur=self.con.execute('select link.fromid,link.toid from linkwords,link where wordid=%d and linkwords.linkid=link.rowid' % wordid)
+			for (fromid,toid) in cur:
+				if fromid in linkscores:
+					pr=self.con.execute('select score from pagerank where urlid=%d' % fromid).fetchone()[0]
+					linkscores[fromid]+=pr
+
+		#maxscore=max(linkscores.values())
+		#normalizedscores=dict([(u,float(l)/maxscore) for (u,l) in linkscores.items()])
+		#return normalizedscores
+		return self.normalizescores(linkscores)
+		  
