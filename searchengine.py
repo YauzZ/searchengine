@@ -3,20 +3,23 @@ import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
 from pysqlite2 import dbapi2 as sqlite
+from DBUtils.PooledDB import PooledDB
 
 ignorewords=set(['the','of','to','and','a','in','is','it'])
 
 class crawler:
-	def __init__(self,dbname):
-		self.con=sqlite.connect(dbname)
-		pass
+	def __init__(self,pool):
+#		self.con=sqlite.connect(dbname)
+		db = pool.connection()
+		self.con=db
 
 	def __del__(self):
+		#con=self.con.cursor()
 		self.con.close()
-		pass
+
 	def dbcommit(self):
+		#con=self.con.cursor()
 		self.con.commit()
-		pass
 	
 	def getentryid(self,table,field,value,createnew=True):
 		cur=self.con.execute(
@@ -122,6 +125,7 @@ class crawler:
 			pages=newpages
 
 	def createindextables(self):
+		self.con=self.con.cursor()
 		self.con.execute('create table IF NOT EXISTS urllist(url)')
 		self.con.execute('create table IF NOT EXISTS wordlist(word)')
 		self.con.execute('create table IF NOT EXISTS wordlocation(urlid interger,wordid interger,location)')
