@@ -106,6 +106,8 @@ class crawler:
 			
 				if not self.isindexed(page):
 					self.addtoindex(page,soup)
+				else: 
+					continue
 
 				links=soup('a')
 				for link in links:
@@ -132,8 +134,6 @@ class crawler:
 		self.con.execute('create index IF NOT EXISTS wordurlidx on wordlocation(wordid)')
 		self.con.execute('create index IF NOT EXISTS urltoidx on link(toid)')
 		self.con.execute('create index IF NOT EXISTS urlfrom on link(fromid)')
-		self.con.execute('create table IF NOT EXISTS pagerank(urlid primary key,score)')
-
 		self.dbcommit()
 
 	def calculatepagerank(self,iterations=20):
