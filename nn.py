@@ -45,4 +45,20 @@ class searchnet:
             self.con.execute('update %s set strength=%f where rowid=%d' % (table,strength,rowid))
 
 
+    def generatehiddennode(self,wordids,urls):
+        if len(wordids)>3:
+            return None
+        createkey='_'.join(sorted([str(wi) for wi in wordids]))
+        res=self.con.execute("select rowid from hiddennode where create_key='%s'" % createkey ).fetchone()
 
+        if res==None:
+             cur=self.con.execute("insert into hiddennode (create_key) values ('%s')" % createkey)
+             hiddenid=cur.lastrowid
+             for wordid in wordids:
+                 self.setstrength(wordid,hiddenid,0,1.0/len(wordids))
+             for urlid in urls:
+                 self.setstrength(hiddenid,urlid,1,0.1)
+             self.con.commit()
+
+
+            
