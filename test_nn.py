@@ -14,3 +14,5 @@ for c in mynet.con.execute('select * from wordhidden'):
 print "hiddenurl:"
 for c in mynet.con.execute('select * from hiddenurl'):
     print c
+
+print mynet.getresult([wWorld,wBank],[uWorldBank,uRiver,uEarth])
