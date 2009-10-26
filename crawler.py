@@ -8,7 +8,6 @@ pagelist=[	'http://kiwitobes.com/wiki/Python_programming_language.html',
 
 
 crawler=searchengine.crawler('searchindex.db')
-#crawler.calculatepagerank()
 crawler.createindextables()
 crawler.crawl(pagelist,2)
 crawler.calculatepagerank()
