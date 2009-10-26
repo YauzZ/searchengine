@@ -2,6 +2,11 @@
 from math import tanh
 from pysqlite2 import dbapi2 as sqlite
 
+
+def dtanh(y):
+    return 1.0-y*y
+
+
 class searchnet:
     def __init__(self,dbname):
         self.con=sqlite.connect(dbname)
@@ -86,7 +91,7 @@ class searchnet:
                     for hiddenid in self.hiddenids]
                     for wordid in self.wordids]
 
-        self.wo = [[self.getstrength(hiddenid,urlid,0)
+        self.wo = [[self.getstrength(hiddenid,urlid,1)
                     for urlid in self.urlids]
                     for hiddenid in self.hiddenids]
 
@@ -112,5 +117,45 @@ class searchnet:
         self.setupnetwork(wordids,urlids)
         return self.feedforward()
 
+    def backPropagate(self,targets,N=0.5):
+        output_deltas = [0.0] * len(self.urlids)
+        for k in range(len(self.urlids)):
+            error = targets[k]-self.ao[k]
+            output_deltas[k] = dtanh(self.ao[k]) * error
 
-        
+        hidden_deltas = [0.0] * len(self.hiddenids)
+        for j in range(len(self.hiddenids)):
+            error = 0.0
+            for k in range(len(self.urlids)):
+                error = error + output_deltas[k] * self.wo[j][k]
+            hidden_deltas[j] = dtanh(self.ah[j]) * error
+
+        for j in range(len(self.hiddenids)):
+            for k in range(len(self.urlids)):
+                change = output_deltas[k] * self.ah[j]
+                self.wo[j][k] = self.wo[j][k] + N*change
+
+        for i in range(len(self.wordids)):
+            for j in range(len(self.hiddenids)):
+                change = hidden_deltas[j] * self.ai[i]
+                self.wi[i][j] = self.wi[i][j] + N*change
+
+    def trainquery(self,wordids,urlids,selectedurl):
+        self.generatehiddennode(wordids,urlids)
+
+        self.setupnetwork(wordids,urlids)
+        self.feedforward()
+        targets = [0.0]*len(urlids)
+        targets[urlids.index(selectedurl)] = 1.0
+        self.backPropagate(targets)
+        self.updatedatabase()
+
+    def updatedatabase(self):
+        for i in range(len(self.wordids)):
+            for j in range(len(self.hiddenids)):
+                self.setstrength(self.wordids[i],self.hiddenids[j],0,self.wi[i][j])
+        for j in range(len(self.hiddenids)):
+            for k in range(len(self.urlids)):
+                self.setstrength(self.hiddenids[j],self.urlids[k],1,self.wo[j][k])
+        self.con.commit()
+
