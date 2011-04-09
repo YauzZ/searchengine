@@ -3,6 +3,7 @@ import urllib2
 from BeautifulSoup import *
 from urlparse import urljoin
 from pysqlite2 import dbapi2 as sqlite
+from mmseg import seg_txt
 
 ignorewords=set(['the','of','to','and','a','in','is','it'])
 
@@ -17,24 +18,24 @@ class crawler:
 	def dbcommit(self):
 		self.con.commit()
 		pass
-	
+
 	def getentryid(self,table,field,value,createnew=True):
 		cur=self.con.execute(
 				"select rowid from %s where %s='%s'" % (table,field,value))
 		res=cur.fetchone()
 		if res==None:
-			cur=self.con.execute( 
+			cur=self.con.execute(
 					"insert into %s (%s) values ('%s')" %(table,field,value))
 			return cur.lastrowid
 		else:
 			return res[0]
-	
+
 	def addtoindex(self,url,soup):
-		print 'Indexing %s' % url 
+		print 'Indexing %s' % url
 
 		text=self.gettextonly(soup)
 		words=self.separatewords(text)
-		
+
 		urlid=self.getentryid('urllist','url',url)
 
 		for i in range(len(words)):
@@ -45,7 +46,7 @@ class crawler:
 			self.con.execute("insert into wordlocation(urlid,wordid,location) \
 					values (%d,%d,%d)" % (urlid,wordid,i))
 
-	
+
 
 	def gettextonly(self,soup):
 		v=soup.string
@@ -60,8 +61,8 @@ class crawler:
 			return v.strip()
 
 	def separatewords(self,text):
-		splitter=re.compile('\\W*')
-		return [s.lower() for s in splitter.split(text) if s!='']
+		print  [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='']
+		return [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='']
 
 	def isindexed(self,url):
 		u=self.con.execute \
@@ -77,14 +78,14 @@ class crawler:
 	def addlinkref(self,urlFrom,urlTo,linkText):
 		fromid=self.getentryid('urllist','url',urlFrom)
 		toid=self.getentryid('urllist','url',urlTo)
-		
+
 		cur=self.con.execute(
 				"select rowid from link where fromid='%s' and toid='%s'" % (fromid,toid))
 		res=cur.fetchone()
 		if res==None:
-			cur=self.con.execute(          
+			cur=self.con.execute(
 				"insert into link (fromid,toid) values ('%s','%s')" %(fromid,toid))
-			linkid=cur.lastrowid           
+			linkid=cur.lastrowid
 		else:
 		    linkid=res[0]
 
@@ -92,7 +93,7 @@ class crawler:
 		for word in words:
 			wordid=self.getentryid('wordlist','word',word)
 			cur=self.con.execute("insert into linkwords (wordid,linkid) values ('%s','%s')" %(linkid,wordid))
-		
+
 	def crawl(self,pages,depth=2):
 		for i in range(depth):
 			newpages=set()
@@ -103,10 +104,10 @@ class crawler:
 					print "Could not open %s" % page
 					continue
 				soup=BeautifulSoup(c.read())
-			
+
 				if not self.isindexed(page):
 					self.addtoindex(page,soup)
-				else: 
+				else:
 					continue
 
 				links=soup('a')
@@ -142,7 +143,7 @@ class crawler:
 		self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
 		self.dbcommit()
 		for i in range(iterations):
-			print "Iteration %d" % (i) 
+			print "Iteration %d" % (i)
 			for (urlid,) in self.con.execute('select rowid from urllist'):
 				pr=0.15
 				for (linker,) in self.con.execute('select distinct fromid from link where toid=%d' % urlid):
@@ -162,7 +163,7 @@ class searcher:
 
 	def __def__(self,dbname):
 		self.con.close()
-	
+
 	def getmatchrows(self,q):
 		fieldlist='w0.urlid'
 		tablelist=''
@@ -191,7 +192,7 @@ class searcher:
 		rows=[row for row in cur]
 
 		return rows,wordids
-	
+
 	def getscoredlist(self,rows,wordids):
 		totalscores=dict([(row[0],0) for row in rows])
 
@@ -241,16 +242,16 @@ class searcher:
 		locations=dict([(row[0],1000000) for row in rows])
 		for row in rows:
 			loc=sum(row[1:])
-			if loc<locations[row[0]]: 
+			if loc<locations[row[0]]:
 				locations[row[0]]=loc
 		return self.normalizescores(locations,smallIsBetter=1)
-	
+
 	def distancescore(self,rows):
 		if len(rows[0])<=2:
 			return dict([(row[0],1.0) for row in rows])
 
 		mindistance=dict([(row[0],1000000) for row in rows])
-		
+
 		for row in rows:
 			dist=sum([abs(row[i]-row[i-1]) for i in range(2,len(row))])
 			if dist<mindistance[row[0]]:
@@ -263,7 +264,7 @@ class searcher:
 						'select count(*) from link where toid=%d' %u).fetchone()[0]) \
 						for u in uniqueurls])
 		return self.normalizescores(inboundcount)
-	
+
 	def pagerankscore(self,rows):
 		pageranks=dict([(row[0],self.con.execute('select score from pagerank where \
 					urlid=%d' % row[0]).fetchone()[0]) for row in rows])
@@ -285,4 +286,4 @@ class searcher:
 		#normalizedscores=dict([(u,float(l)/maxscore) for (u,l) in linkscores.items()])
 		#return normalizedscores
 		return self.normalizescores(linkscores)
-		  
+
