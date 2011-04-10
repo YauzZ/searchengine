@@ -4,12 +4,14 @@ from BeautifulSoup import *
 from urlparse import urljoin
 from pysqlite2 import dbapi2 as sqlite
 from mmseg import seg_txt
+import MySQLdb
 
 ignorewords=set(['the','of','to','and','a','in','is','it'])
 
 class crawler:
 	def __init__(self,dbname):
-		self.con=sqlite.connect(dbname)
+		#		self.con=sqlite.connect(dbname)
+		self.con = MySQLdb.connect(passwd='jljuji9',db=dbname)
 		pass
 
 	def __del__(self):
@@ -20,13 +22,16 @@ class crawler:
 		pass
 
 	def getentryid(self,table,field,value,createnew=True):
-		cur=self.con.execute(
+		cur = self.con.cursor()
+		cur.execute(
 				"select rowid from %s where %s='%s'" % (table,field,value))
 		res=cur.fetchone()
 		if res==None:
-			cur=self.con.execute(
+			cur.execute(
 					"insert into %s (%s) values ('%s')" %(table,field,value))
-			return cur.lastrowid
+			relt=cur.lastrowid
+			cur.close()
+			return relt
 		else:
 			return res[0]
 
@@ -43,10 +48,9 @@ class crawler:
 			if word in ignorewords:
 				continue
 			wordid=self.getentryid('wordlist','word',word)
-			self.con.execute("insert into wordlocation(urlid,wordid,location) \
+			cur = self.con.cursor()
+			cur.execute("insert into wordlocation(urlid,wordid,location) \
 					values (%d,%d,%d)" % (urlid,wordid,i))
-
-
 
 	def gettextonly(self,soup):
 		v=soup.string
@@ -65,25 +69,29 @@ class crawler:
 		return [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='']
 
 	def isindexed(self,url):
-		u=self.con.execute \
-		  ("select rowid from urllist where url='%s'" % url).fetchone()
+		cur = self.con.cursor()
+		cur.execute("select rowid from urllist where url='%s'" % url)
+		u=cur.fetchone()
 		if u!=None:
-			v=self.con.execute(
-					'select * from wordlocation where urlid=%d' % u[0]).fetchone()
+			cur.execute('select * from wordlocation where urlid=%d' % u[0])
+			v=cur.fetchone()
 			if v!=None:
 				print "indexed :",url
+				cur.close()
 				return True
+		cur.close()
 		return False
 
 	def addlinkref(self,urlFrom,urlTo,linkText):
 		fromid=self.getentryid('urllist','url',urlFrom)
 		toid=self.getentryid('urllist','url',urlTo)
 
-		cur=self.con.execute(
+		cur = self.con.cursor()
+		cur.execute(
 				"select rowid from link where fromid='%s' and toid='%s'" % (fromid,toid))
 		res=cur.fetchone()
 		if res==None:
-			cur=self.con.execute(
+			cur.execute(
 				"insert into link (fromid,toid) values ('%s','%s')" %(fromid,toid))
 			linkid=cur.lastrowid
 		else:
@@ -92,7 +100,7 @@ class crawler:
 		words=self.separatewords(linkText)
 		for word in words:
 			wordid=self.getentryid('wordlist','word',word)
-			cur=self.con.execute("insert into linkwords (wordid,linkid) values ('%s','%s')" %(linkid,wordid))
+			cur.execute("insert into linkwords (wordid,linkid) values ('%s','%s')" %(linkid,wordid))
 
 	def crawl(self,pages,depth=2):
 		for i in range(depth):
@@ -125,32 +133,44 @@ class crawler:
 			pages=newpages
 
 	def createindextables(self):
-		self.con.execute('create table IF NOT EXISTS urllist(url)')
-		self.con.execute('create table IF NOT EXISTS wordlist(word)')
-		self.con.execute('create table IF NOT EXISTS wordlocation(urlid interger,wordid interger,location)')
-		self.con.execute('create table IF NOT EXISTS link(fromid integer,toid integer)')
-		self.con.execute('create table IF NOT EXISTS linkwords(wordid interger,linkid interger)')
-		self.con.execute('create index IF NOT EXISTS wordidx on wordlist(word)')
-		self.con.execute('create index IF NOT EXISTS urlidx on urllist(url)')
-		self.con.execute('create index IF NOT EXISTS wordurlidx on wordlocation(wordid)')
-		self.con.execute('create index IF NOT EXISTS urltoidx on link(toid)')
-		self.con.execute('create index IF NOT EXISTS urlfrom on link(fromid)')
+		cur = self.con.cursor()
+		cur.execute('create table IF NOT EXISTS urllist(rowid MEDIUMINT NOT NULL AUTO_INCREMENT , \
+				url VARCHAR(50), PRIMARY KEY (rowid))')
+		cur.execute('create table IF NOT EXISTS wordlist(rowid MEDIUMINT NOT NULL AUTO_INCREMENT , \
+				word VARCHAR(50), PRIMARY KEY (rowid))')
+		cur.execute('create table IF NOT EXISTS wordlocation(urlid INT,wordid INT,location VARCHAR(50))')
+		cur.execute('create table IF NOT EXISTS link(fromid INT,toid INT, \
+				rowid MEDIUMINT NOT NULL AUTO_INCREMENT ,PRIMARY KEY (rowid))')
+		cur.execute('create table IF NOT EXISTS linkwords(wordid INT,linkid INT)')
+#		cur.execute('create index IF NOT EXISTS wordidx on wordlist(word)')
+#		cur.execute('create index IF NOT EXISTS urlidx on urllist(url VARCHAR(50))')
+#		cur.execute('create index IF NOT EXISTS wordurlidx on wordlocation(wordid)')
+#		cur.execute('create index IF NOT EXISTS urltoidx on link(toid)')
+#		cur.execute('create index IF NOT EXISTS urlfrom on link(fromid)')
+		cur.close()
 		self.dbcommit()
 
 	def calculatepagerank(self,iterations=20):
-		self.con.execute('drop table if exists pagerank')
-		self.con.execute('create table pagerank(urlid primary key,score)')
-		self.con.execute('insert into pagerank select rowid, 1.0 from urllist')
+		cur = self.con.cursor()
+		cur.execute('drop table if exists pagerank')
+		cur.execute('create table pagerank(urlid INT,score INT, PRIMARY KEY (urlid))')
+		cur.execute('insert into pagerank select rowid, 1.0 from urllist')
 		self.dbcommit()
+
 		for i in range(iterations):
 			print "Iteration %d" % (i)
-			for (urlid,) in self.con.execute('select rowid from urllist'):
+			cur = self.con.cursor()
+			cur.execute('select rowid from urllist')
+			for (urlid,) in cur.fetchall():
 				pr=0.15
-				for (linker,) in self.con.execute('select distinct fromid from link where toid=%d' % urlid):
-					linkingpr=self.con.execute('select score from pagerank where urlid=%d' % linker).fetchone()[0]
-					linkingcount=self.con.execute('select count(*) from link where fromid=%d' % linker).fetchone()[0]
+				cur.execute('select distinct fromid from link where toid=%d' % urlid)
+				for (linker,) in cur.fetchall():
+					cur.execute('select score from pagerank where urlid=%d' % linker)
+					linkingpr=cur.fetchone()[0]
+					cur.execute('select count(*) from link where fromid=%d' % linker)
+					linkingcount=cur.fetchone()[0]
 					pr+=0.85*(linkingpr/linkingcount)
-					self.con.execute('update pagerank set score=%f where urlid=%d' % (pr,urlid))
+					cur.execute('update pagerank set score=%f where urlid=%d' % (pr,urlid))
 		self.dbcommit()
 
 if __name__ == "__main__":
@@ -196,11 +216,11 @@ class searcher:
 	def getscoredlist(self,rows,wordids):
 		totalscores=dict([(row[0],0) for row in rows])
 
-		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
+		weights=[#(1.0,self.frequencyscore(rows)),	#单词频度
 				 (1.0,self.locationscore(rows)),	#文档位置
-				 (1.0,self.distancescore(rows)),	#单词距离
-				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
-				 (1.0,self.pagerankscore(rows)),	#PageRank算法
+				# (1.0,self.distancescore(rows)),	#单词距离
+				# (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
+				# (1.0,self.pagerankscore(rows)),	#PageRank算法
 				 (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
 				]
 

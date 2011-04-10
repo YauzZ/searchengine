@@ -1,11 +1,11 @@
 import searchengine
 import threading
 
-pagelist=[ 'http://baike.baidu.com/',
+pagelist=[ 'http://www.taobao.com/',
 	]
 
 
-crawler=searchengine.crawler('searchindex.db')
+crawler=searchengine.crawler('pages')
 crawler.createindextables()
 crawler.crawl(pagelist,2)
 crawler.calculatepagerank()
