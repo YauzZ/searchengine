@@ -65,8 +65,10 @@ class crawler:
 			return v.strip()
 
 	def separatewords(self,text):
-		print  [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='']
-		return [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='']
+		for s in seg_txt(text.encode('utf-8')):
+			if s!='' and len(s)>3 and not s.isalnum():
+				print s
+		return [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='' and len(s)>3 and not s.isalnum()]
 
 	def isindexed(self,url):
 		cur = self.con.cursor()
@@ -135,13 +137,15 @@ class crawler:
 	def createindextables(self):
 		cur = self.con.cursor()
 		cur.execute('create table IF NOT EXISTS urllist(rowid MEDIUMINT NOT NULL AUTO_INCREMENT , \
-				url VARCHAR(50), PRIMARY KEY (rowid))')
+				url VARCHAR(200), PRIMARY KEY (rowid), index urlidx (url(200)))')
 		cur.execute('create table IF NOT EXISTS wordlist(rowid MEDIUMINT NOT NULL AUTO_INCREMENT , \
-				word VARCHAR(50), PRIMARY KEY (rowid))')
-		cur.execute('create table IF NOT EXISTS wordlocation(urlid INT,wordid INT,location VARCHAR(50))')
+				word VARCHAR(50), PRIMARY KEY (rowid), index wordidx (word(50)))')
+		cur.execute('create table IF NOT EXISTS wordlocation(urlid INT,wordid INT,location VARCHAR(50), \
+				index wordurlidx (wordid)) ')
 		cur.execute('create table IF NOT EXISTS link(fromid INT,toid INT, \
-				rowid MEDIUMINT NOT NULL AUTO_INCREMENT ,PRIMARY KEY (rowid))')
-		cur.execute('create table IF NOT EXISTS linkwords(wordid INT,linkid INT)')
+				rowid MEDIUMINT NOT NULL AUTO_INCREMENT ,PRIMARY KEY (rowid),index urltoidx (toid),\
+				index urlfromidx (fromid)) ')
+		cur.execute('create table IF NOT EXISTS linkwords(wordid INT,linkid INT) ')
 #		cur.execute('create index IF NOT EXISTS wordidx on wordlist(word)')
 #		cur.execute('create index IF NOT EXISTS urlidx on urllist(url VARCHAR(50))')
 #		cur.execute('create index IF NOT EXISTS wordurlidx on wordlocation(wordid)')
