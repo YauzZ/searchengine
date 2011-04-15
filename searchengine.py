@@ -11,7 +11,7 @@ ignorewords=set(['the','of','to','and','a','in','is','it'])
 class crawler:
 	def __init__(self,dbname):
 		#		self.con=sqlite.connect(dbname)
-		self.con = MySQLdb.connect(passwd='jljuji9',db=dbname)
+		self.con = MySQLdb.connect(passwd='jljuji9',db=dbname,user='root')
 		pass
 
 	def __del__(self):
@@ -65,9 +65,9 @@ class crawler:
 			return v.strip()
 
 	def separatewords(self,text):
-		for s in seg_txt(text.encode('utf-8')):
-			if s!='' and len(s)>3 and not s.isalnum():
-				print s
+		#		for s in seg_txt(text.encode('utf-8')):
+		#	if s!='' and len(s)>3 and not s.isalnum():
+		#		print s
 		return [s.lower() for s in seg_txt(text.encode('utf-8')) if s!='' and len(s)>3 and not s.isalnum()]
 
 	def isindexed(self,url):
@@ -118,7 +118,8 @@ class crawler:
 				if not self.isindexed(page):
 					self.addtoindex(page,soup)
 				else:
-					continue
+					if depth < 3:
+						continue
 
 				links=soup('a')
 				for link in links:
@@ -157,7 +158,7 @@ class crawler:
 	def calculatepagerank(self,iterations=20):
 		cur = self.con.cursor()
 		cur.execute('drop table if exists pagerank')
-		cur.execute('create table pagerank(urlid INT,score INT, PRIMARY KEY (urlid))')
+		cur.execute('create table pagerank(urlid INT,score INT, PRIMARY KEY (urlid)) ENGINE=MEMORY')
 		cur.execute('insert into pagerank select rowid, 1.0 from urllist')
 		self.dbcommit()
 
