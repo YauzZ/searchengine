@@ -5,6 +5,9 @@ from urlparse import urljoin
 from pysqlite2 import dbapi2 as sqlite
 from mmseg import seg_txt
 import MySQLdb
+import socket
+
+socket.setdefaulttimeout(10)
 
 ignorewords=set(['the','of','to','and','a','in','is','it'])
 
@@ -184,8 +187,8 @@ if __name__ == "__main__":
 
 class searcher:
 	def __init__(self,dbname):
-		self.con=sqlite.connect(dbname)
 
+		self.con = MySQLdb.connect(passwd='jljuji9',db=dbname,user='root')
 	def __def__(self,dbname):
 		self.con.close()
 
