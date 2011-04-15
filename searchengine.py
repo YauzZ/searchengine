@@ -202,8 +202,10 @@ class searcher:
 		tablenumber=0
 
 		for word in words:
-			wordrow=self.con.execute(
-					"select rowid from wordlist where word='%s'" % word).fetchone()
+			cur = self.con.cursor()
+			cur.execute(
+					"select rowid from wordlist where word='%s'" % word)
+			wordrow=cur.fetchone()
 			if wordrow!=None:
 				wordid=wordrow[0]
 				wordids.append(wordid)
@@ -216,18 +218,19 @@ class searcher:
 				clauselist+='w%d.wordid=%d' % (tablenumber,wordid)
 				tablenumber+=1
 		fullquery='select %s from %s where %s' % (fieldlist,tablelist,clauselist)
-		cur=self.con.execute(fullquery)
-		rows=[row for row in cur]
+		cur.execute(fullquery)
+		relt=cur.fetchall()
+		rows=[row for row in relt]
 
 		return rows,wordids
 
 	def getscoredlist(self,rows,wordids):
 		totalscores=dict([(row[0],0) for row in rows])
 
-		weights=[#(1.0,self.frequencyscore(rows)),	#单词频度
-				 (1.0,self.locationscore(rows)),	#文档位置
-				# (1.0,self.distancescore(rows)),	#单词距离
-				# (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
+		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
+				# (1.0,self.locationscore(rows)),	#文档位置
+				 (1.0,self.distancescore(rows)),	#单词距离
+				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
 				# (1.0,self.pagerankscore(rows)),	#PageRank算法
 				 (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
 				]
@@ -239,16 +242,19 @@ class searcher:
 		return totalscores
 
 	def geturlname(self,id):
-		return self.con.execute(
-				"select url from urllist where rowid=%d" % id).fetchone()[0]
+		cur = self.con.cursor()
+		cur.execute("select url from urllist where rowid=%d" % id)
+		return cur.fetchone()[0]
 
 	def query(self,q):
-		rows,wordids=self.getmatchrows(q)
-		scores=self.getscoredlist(rows,wordids)
-		rankedscores=sorted([(score,url) for (url,score) in scores.items()],reverse=1)
-		for (score,urlid) in rankedscores[0:10]:
-			print '%f\t%s' % (score,self.geturlname(urlid))
-
+		#try:
+			rows,wordids=self.getmatchrows(q)
+			scores=self.getscoredlist(rows,wordids)
+			rankedscores=sorted([(score,url) for (url,score) in scores.items()],reverse=1)
+			for (score,urlid) in rankedscores[0:10]:
+				print '%f\t%s' % (score,self.geturlname(urlid))
+		#except:
+		#	print "出错了"
 	def normalizescores(self,scores,smallIsBetter=0):
 		vsmall=0.00001
 		if smallIsBetter:
@@ -287,27 +293,34 @@ class searcher:
 		return self.normalizescores(mindistance,smallIsBetter=1)
 
 	def inboundlinkscore(self,rows):
+		cur = self.con.cursor()
 		uniqueurls=set([row[0] for row in rows])
-		inboundcount=dict([(u,self.con.execute( \
-						'select count(*) from link where toid=%d' %u).fetchone()[0]) \
-						for u in uniqueurls])
+		inboundcount={}
+		for u in uniqueurls:
+			cur.execute('select count(*) from link where toid=%d' % u)
+			inboundcount[u]=cur.fetchone()[0]
 		return self.normalizescores(inboundcount)
 
 	def pagerankscore(self,rows):
-		pageranks=dict([(row[0],self.con.execute('select score from pagerank where \
-					urlid=%d' % row[0]).fetchone()[0]) for row in rows])
+		cur = self.con.cursor()
+		cur.execute('select score from pagerank whereurlid=%d' % row[0])
+		pageranks=dict([(row[0],cur.fetchone()[0]) for row in rows])
+
 		#maxrank=max(pageranks.values())
 		#normalizedscores=dict([(u,float(1)/maxrank) for (u,l) in pageranks.items()])
 		#return normalizedscores
 		return self.normalizescores(pageranks)
 
 	def linktextscore(self,rows,wordids):
+		cur = self.con.cursor()
 		linkscores=dict([(row[0],0) for row in rows])
 		for wordid in wordids:
-			cur=self.con.execute('select link.fromid,link.toid from linkwords,link where wordid=%d and linkwords.linkid=link.rowid' % wordid)
-			for (fromid,toid) in cur:
+			cur.execute('select link.fromid,link.toid from linkwords,link where wordid=%d and linkwords.linkid=link.rowid' % wordid)
+			relt=cur.fetchall()
+			for (fromid,toid) in relt:
 				if fromid in linkscores:
-					pr=self.con.execute('select score from pagerank where urlid=%d' % fromid).fetchone()[0]
+					cur.execute('select score from pagerank where urlid=%d' % fromid)
+					pr=cur.fetchone()[0]
 					linkscores[fromid]+=pr
 
 		#maxscore=max(linkscores.values())

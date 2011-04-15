@@ -6,5 +6,5 @@ pagelist=[ 'http://www.talkcc.com',
 
 crawler=searchengine.crawler('pages')
 crawler.createindextables()
-crawler.crawl(pagelist,2)
+crawler.crawl(pagelist,4)
 
