@@ -7,7 +7,7 @@ from mmseg import seg_txt
 import MySQLdb
 import socket
 
-socket.setdefaulttimeout(10)
+socket.setdefaulttimeout(3)
 
 ignorewords=set(['the','of','to','and','a','in','is','it'])
 
@@ -116,8 +116,10 @@ class crawler:
 				except:
 					print "Could not open %s" % page
 					continue
-				soup=BeautifulSoup(c.read())
-
+				try:
+					soup=BeautifulSoup(c.read())
+				except:
+					continue
 				if not self.isindexed(page):
 					self.addtoindex(page,soup)
 				else:
