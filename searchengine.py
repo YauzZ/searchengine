@@ -112,6 +112,9 @@ class crawler:
 			newpages=set()
 			for page in pages:
 				try:
+					page=page.encode('utf-8')
+					page=urllib2.unquote(page)
+
 					c=urllib2.urlopen(page)
 				except:
 					print "Could not open %s" % page
@@ -220,7 +223,11 @@ class searcher:
 				clauselist+='w%d.wordid=%d' % (tablenumber,wordid)
 				tablenumber+=1
 		fullquery='select %s from %s where %s' % (fieldlist,tablelist,clauselist)
-		cur.execute(fullquery)
+		try:
+			cur.execute(fullquery)
+		except:
+			print "query error!"
+
 		relt=cur.fetchall()
 		rows=[row for row in relt]
 
