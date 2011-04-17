@@ -240,7 +240,7 @@ class searcher:
 				# (1.0,self.locationscore(rows)),	#文档位置
 				 (1.0,self.distancescore(rows)),	#单词距离
 				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
-				# (1.0,self.pagerankscore(rows)),	#PageRank算法
+				 (1.0,self.pagerankscore(rows)),	#PageRank算法
 				 (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
 				]
 
@@ -311,9 +311,14 @@ class searcher:
 		return self.normalizescores(inboundcount)
 
 	def pagerankscore(self,rows):
+		#		pageranks=dict([(row[0],self.con.execute('select score from pagerank where \
+		#		urlid=%d' % row[0]).fetchone()[0]) for row in rows])
+
 		cur = self.con.cursor()
-		cur.execute('select score from pagerank whereurlid=%d' % row[0])
-		pageranks=dict([(row[0],cur.fetchone()[0]) for row in rows])
+		pageranks={}
+		for row in rows:
+			cur.execute('select score from pagerank where urlid=%d' % row[0])
+			pageranks[row[0]]=cur.fetchone()[0]
 
 		#maxrank=max(pageranks.values())
 		#normalizedscores=dict([(u,float(1)/maxrank) for (u,l) in pageranks.items()])
