@@ -126,7 +126,7 @@ class crawler:
 				if not self.isindexed(page):
 					self.addtoindex(page,soup)
 				else:
-					if depth < 3:
+					if depth-i < 1:
 						continue
 
 				links=soup('a')
@@ -137,8 +137,8 @@ class crawler:
 						url=url.split('#')[0]
 						if url[0:4]=='http' and not self.isindexed(url):
 							newpages.add(url)
-						linkText=self.gettextonly(link)
-						self.addlinkref(page,url,linkText)
+					#	linkText=self.gettextonly(link)
+					#	self.addlinkref(page,url,linkText)
 
 				self.dbcommit()
 			pages=newpages
@@ -166,7 +166,7 @@ class crawler:
 	def calculatepagerank(self,iterations=20):
 		cur = self.con.cursor()
 		cur.execute('drop table if exists pagerank')
-		cur.execute('create table pagerank(urlid INT,score INT, PRIMARY KEY (urlid)) ENGINE=MEMORY')
+		cur.execute('create table pagerank(urlid INT,score INT, PRIMARY KEY (urlid)) ')
 		cur.execute('insert into pagerank select rowid, 1.0 from urllist')
 		self.dbcommit()
 
@@ -238,10 +238,10 @@ class searcher:
 
 		weights=[(1.0,self.frequencyscore(rows)),	#单词频度
 				# (1.0,self.locationscore(rows)),	#文档位置
-				 (1.0,self.distancescore(rows)),	#单词距离
-				 (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
+				# (2.0,self.distancescore(rows)),	#单词距离
+				# (1.0,self.inboundlinkscore(rows)),	#外部回指链接简单计数
 				 (1.0,self.pagerankscore(rows)),	#PageRank算法
-				 (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
+				# (1.0,self.linktextscore(rows,wordids))	#基于链接文本的PageRank算法
 				]
 
 		for (weight,scores) in weights:
@@ -271,7 +271,10 @@ class searcher:
 			return dict([(u,float(minscore)/max(vsmall,l)) for (u,l) \
 					in scores.items()])
 		else:
-			maxscore=max(scores.values())
+			if scores.values():
+				maxscore=max(scores.values())
+			else:
+				maxscore=0
 			if maxscore==0: maxscore=vsmall
 			return dict([(u,float(c)/maxscore) for (u,c) in scores.items()])
 
